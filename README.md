@@ -1,52 +1,129 @@
-Delivery date: April 30th 2025, 14:00
-Format: 1) Jupyter notebook (ipynb-file) containing runnable Python code, documentation and
-reflections on the process and result;
-2) a pdf file created from the Jupyter notebook with all Python code executed and models built.
-Word limit: The total text parts should not be more than 3000 words. There are no limits on Python
-code size, as well as the number of figures, tables, and graphs.
-Groups: for the assignment, you need to a form a group of 3-4 people. It is strongly recommended
-that everyone in the group attends the same seminar slot. Having smaller groups is not allowed
-unless you get an official permission. If there are reasons that preclude you from joining a group,
-please write to the course coordinator and the seminar coordinator ASAP.
-Delivery system: you submit your assignment as a group on Inspera. Do not forget to anonymise the
-documents, i.e. remove all the names.
-Feedback sessions: we will run three (3) feedback session, where you can upload your current
-version of the assignment and get feedback from TAs during your seminar sessions. This is voluntary.
-Deadlines and links for uploading your work-in-progress are on MittUiB.
----------------------------------------------------------------------------------------------------------------------------------
-Submission information
-You shall deliver the assignment in the form of a well commented Jupyter notebook. This code needs
-to run on the original data set, so any preprocessing you choose to do needs to be programmed in
-Python and included in the notebook. The code shall in the end return the results of your
-experiments with your chosen models. As a backup, you will also deliver the same notebook that you
-have run on your computer as a pdf file.
-‘Well commented notebook’ means that you need to explain your choices and decisions based on the
-given data. Moreover, you need to provide your assessment of performance of your trained models
-and the reasons for such a performance.
-For example, you need to explain
-- Important and relevant properties of the data
-- Your preprocessing steps. For example: your process of feature selection and its results, your
-choices when it comes to dimension reduction (why/why not/which method/why that method)
-etc.
-- Based on what you have learnt from the data, why do you think that your models are best-suited
-for the task
-- Why the particular parameters of a model that you use work best
-- How you control over- and underfitting
-- Your choice of evaluation methods. Which metrics did you choose and why? Additionally, you
-need to give an explanation based on your intuition about why given methods perform better or
-worse on the given task.
-Provide the list of libraries you use in the form of a requirements.txt in the format used by pip.
-Finally, as a concluding comment in the Jupyter notebook, you need to write a summary of your
-results, and discuss consequences of such results.
-As the choice of evaluation is up to you, a high evaluation score is not necessary for any grade,
-including an A. Low scores need to be explained sufficiently, and an attempt to create a performant
-model must be clear from the documentation you hand in. The spirit of the task is not to create a
-performant model, but to showcase an understanding of relevant techniques and an ability to apply
-them sufficiently in practice.
-Note: The datasets may be too large for your personal computer. You are encouraged to work around
-this by, for example, sampling a part of the data or using Google Collab. Indicate this issue in your
-submitted document.
-Final note: The data is prepared for this course and are shared with you in confidence that you do not
-share them in any way but use them only for the purpose of this exam. Moreover, use of external
-code (from, e.g., stackexchange) should be clearly highlighted. The same goes for the use of AI tools
-like ChatGPT. Please, mark clearly, from where you adapt the code, if you do so.
+# INFO284 Machine Learning – Group Exam (Spring 2026)
+
+A two-task machine learning project completed as a group exam in the course **INFO284 Machine Learning**. The project covers sentiment analysis of WhatsApp app reviews and binary classification of AI-generated vs. real artwork.
+
+---
+
+## Tasks
+
+### Task 1 – Sentiment Analysis of WhatsApp Reviews
+
+Predicts the star rating (1–5) of WhatsApp Google Play reviews from review text. Four models are trained and evaluated on the same data split.
+
+**Dataset:** `reviews.csv` – 6 210 reviews with columns `review_id`, `rating`, `review_text`, `review_date`, `helpful`. After cleaning (removing gibberish, spam repetition, emoji-only, and non-English reviews), 5 657 reviews remain.
+
+**Models:**
+
+| Model | Accuracy | Macro F1 | Notes |
+|---|---|---|---|
+| Logistic Regression | 0.493 | 0.33 | TF-IDF (unigrams + bigrams), C=1.0, L2, grid search |
+| LinearSVC (SVM) | 0.601 | 0.35 | Best overall; C=0.1 via 5-fold CV |
+| LightGBM | 0.535 | 0.30 | Class-weighted; grid search over depth and estimators |
+| Bidirectional LSTM | 0.527 | 0.33 | Most balanced minority-class coverage; data augmentation |
+
+**Key design decisions:**
+- Class weighting applied to all four models to address the heavy imbalance (rating 5 = ~49% of data)
+- Macro F1 used as primary metric rather than accuracy
+- Shared text cleaning pipeline: lowercasing, URL/email removal, stopword filtering (with negation words kept), domain noise (`app`, `whatsapp`) added to stoplist
+- 80/20 stratified train/test split with `random_state=42`; hyperparameters tuned on training data only via cross-validation
+- LSTM only: synonym-based data augmentation (`nlpaug`) to balance minority classes before training
+
+---
+
+### Task 2 – AI vs. Real Art Classifier
+
+Binary image classifier that distinguishes AI-generated art from human-made art, using transfer learning on a small dataset.
+
+**Dataset:** `Art_shuffled/` – 1 012 images (559 AI, 453 real), split into `AiArtData/` and `RealArt/` subfolders.
+
+**Model:** EfficientNetB0 pretrained on ImageNet, with a custom classification head:
+- `GlobalAveragePooling2D` → `Dense(128, ReLU)` → `Dropout(0.3)` → `Dense(1, sigmoid)`
+
+**Training:** Two-phase approach:
+1. **Phase 1 (frozen base):** Only the classification head is trained (Adam lr=1e-3, up to 20 epochs, EarlyStopping patience=3)
+2. **Phase 2 (fine-tuning):** Last 20 layers of EfficientNetB0 unfrozen and trained at a lower rate (Adam lr=1e-5, EarlyStopping patience=3)
+
+**Results (validation set, 194 images):**
+
+| Class | Precision | Recall | F1 |
+|---|---|---|---|
+| AI Art | 0.75 | 0.85 | 0.79 |
+| Real Art | 0.78 | 0.64 | 0.70 |
+| **Overall accuracy** | | | **0.76** |
+
+**Task 2b – New images:** The model was tested on 5 self-sourced images (3 AI, 2 real). Accuracy was 40% (2/5), with both real photographs misclassified as AI. Photorealistic AI images also caused misclassification, as the training set skews toward illustrative AI art.
+
+---
+
+## Project Structure
+
+```
+├── reviews.csv               # WhatsApp review dataset (Task 1)
+├── Art_shuffled/
+│   ├── AiArtData/            # AI-generated images
+│   └── RealArt/              # Human-made art images
+├── task2_new_images/         # 5 self-sourced images for Task 2b
+│   ├── AiArtData/
+│   └── RealArt/
+├── art_classifier.keras      # Saved EfficientNetB0 model (generated on run)
+└── final_submission.pdf      # Full notebook export (this file)
+```
+
+---
+
+## Dependencies
+
+```
+tensorflow
+scikit-learn
+lightgbm
+nltk
+nlpaug
+pandas
+numpy
+matplotlib
+seaborn
+```
+
+Install with:
+
+```bash
+pip install tensorflow scikit-learn lightgbm nltk nlpaug pandas numpy matplotlib seaborn
+```
+
+Additional NLTK data downloads are handled automatically in the notebook:
+
+```python
+nltk.download('stopwords')
+nltk.download('wordnet')
+nltk.download('averaged_perceptron_tagger_eng')
+```
+
+---
+
+## Usage
+
+Run the notebook top-to-bottom. Both tasks are contained in a single notebook.
+
+- Task 1 expects `reviews.csv` in the working directory
+- Task 2 expects `Art_shuffled/` in the working directory
+- Task 2b expects `task2_new_images/` with `AiArtData/` and `RealArt/` subfolders
+
+The trained image classifier is saved to `art_classifier.keras` after Phase 2 and reloaded automatically for Task 2b if already present.
+
+---
+
+## Use of AI Tools
+
+AI assistants (ChatGPT GPT-5.3 and Claude Sonnet 4.6) were used as productivity tools for routine implementation tasks: data cleaning regex patterns, boilerplate EDA code, plot formatting, and debugging. All generated code was reviewed and tested. Model selection, evaluation strategy, and interpretation of results were done independently by the group.
+
+---
+
+## References
+
+- Müller, A. C. & Guido, S. – *Introduction to Machine Learning with Python*
+- Géron, A. – *Hands-on Machine Learning with Scikit-Learn, Keras & TensorFlow*
+- [scikit-learn documentation](https://scikit-learn.org/stable/)
+- [LightGBM documentation](https://lightgbm.readthedocs.io/)
+- [TensorFlow / Keras API](https://www.tensorflow.org/api_docs/python/tf/keras)
+- [TensorFlow Transfer Learning Guide](https://www.tensorflow.org/tutorials/images/transfer_learning)
